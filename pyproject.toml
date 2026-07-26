@@ -51,7 +51,7 @@ skip = "*-musllinux*"
 archs = ["x86_64"]
 # The manylinux image ships gcc/ar/bash — everything vendor/build.sh
 # needs. auditwheel then re-tags/repairs the wheel for manylinux.
-manylinux-x86-64-image = "manylinux2014"
+manylinux-x86_64-image = "manylinux2014"
 
 # After building each wheel, import it and run a real seal round-trip in a
 # fresh env — proves the bundled .so loads and the crypto works, not just
