@@ -5,11 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "libtab"
 version = "0.1.0"
-description = "ctypes binding to objective-9c's libtab C implementation for .tab files"
+description = "A lightweight document store in plain, greppable files — declared schema, deterministic ordering, and optional per-field encryption."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    # Prebuilt wheels target Linux x86_64 only. Other platforms are not
+    # currently tested or supported (no macOS/Windows to verify on).
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Security :: Cryptography",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0", "argon2-cffi>=23.1"]

@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
@@ -25,6 +26,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 class BuildLibtabSo(build_ext):
     def run(self) -> None:
+        # Prebuilt wheels are Linux x86_64 only. On other platforms pip falls
+        # back to the sdist and lands here; the vendored plan9port build is
+        # not portable to macOS/Windows, so fail with a clear message instead
+        # of a cryptic compiler error deep in build.sh.
+        if not sys.platform.startswith("linux"):
+            raise RuntimeError(
+                "libtab ships prebuilt wheels for Linux x86_64 only, and "
+                f"building from source is not supported on {sys.platform!r}. "
+                "See https://github.com/kiljoy001/py-libtab for platform status."
+            )
+
         build_sh = os.path.join(HERE, "vendor", "build.sh")
         if not os.path.exists(build_sh):
             raise RuntimeError(f"vendor/build.sh missing at {build_sh}")
