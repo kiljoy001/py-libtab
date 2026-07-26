@@ -1,28 +1,36 @@
 # py-libtab
 
-**Plain-text tables with real cryptography embedded per field — from Python.**
+**A lightweight, database-like store — without the database engine.
+SQLite gave you a relational DB in a file; py-libtab gives you a
+document store in files, and the files stay human-readable.**
 
 py-libtab writes and reads `.tab` files: ordinary, human-readable text files
-where an individual field can be **hashed** (an irreversible digest),
-**signed** (tamper-evident, authenticated), or **sealed** (encrypted — the
-plaintext can't be read without the key), using audited crypto (BLAKE2b,
-argon2id, Ed25519, XChaCha20-Poly1305). The crypto travels *inside the file* —
-algorithm, parameters, nonce, and salt ride in the cell itself — so a file is
-self-contained, and the non-secret parts stay fully inspectable with `cat`,
-`grep`, and `git diff`.
+that behave like a small document/NoSQL collection. Each file carries a
+**declared, typed schema** (the columns live *in the file itself* — nothing
+external to keep in sync), rows in a **deterministic order** (so the same data
+serializes byte-for-byte the same, and files diff cleanly in `git`), and, when
+you want it, **per-field cryptography** — a field can be **hashed**, **signed**,
+or **sealed** (encrypted), with the algorithm and parameters riding inline in
+the cell. It's just a file: `cat` it, `grep` it, `git diff` it, back it up
+with `cp`.
 
 ## Why this exists
 
 If you want structured data on disk from Python, your options are usually:
 
-- a **database** — opaque binary, needs sqlite/a server, can't `grep` it;
-- **JSON/CSV** — plain text, but you bolt crypto on by hand and your
-  hash/signature format ends up ad-hoc (and probably subtly wrong);
-- a **secrets manager** — heavyweight, external service.
+- a **database** — SQLite or a server: real queries, but an opaque binary
+  and an engine to run; you can't `grep` it or `git diff` it;
+- a **document store** (Mongo & friends) — the document shape you want, but
+  your documents are locked inside the engine, not files you can open;
+- **JSON/CSV** — real files, but no declared schema, no stable ordering, and
+  if you need crypto you bolt it on by hand (and probably get it subtly wrong).
 
-There's no lightweight middle: *a readable text file where a field can simply
-**be** a verified hash, a signed value, or an encrypted secret.* That's the
-gap py-libtab fills.
+There's no lightweight middle: *a document store whose documents are real,
+readable files — schema and ordering built in, crypto available per field.*
+That's the gap py-libtab fills. It's a **store and a format, not a query
+engine**: you get attribute lookup and search over a table, not joins,
+indexes, or cross-collection transactions — that's the point of having no
+engine.
 
 ### Three ways to protect a field
 
