@@ -31,7 +31,7 @@ if [ "${SANITIZE:-0}" = "1" ]; then
 fi
 
 mkdir -p "$OUT"
-CC=(gcc -DPLAN9PORT -I"$INC" -O2 -fPIC -w "${SAN_FLAGS[@]}" -c)
+CC=(gcc -DPLAN9PORT -I"$INC" -O2 -fPIC -w "${SAN_FLAGS[@]+"${SAN_FLAGS[@]}"}" -c)
 
 build_lib() {
     local libname="$1"; shift
@@ -46,7 +46,7 @@ build_lib() {
             # mkfile: get9root.$O: get9root.c ; $CC $CFLAGS -DPLAN9_TARGET=\"$PLAN9_TARGET\" get9root.c
             extra=(-DPLAN9_TARGET="\"$(uname -m)-linux\"")
         fi
-        "${CC[@]}" "${extra[@]}" -I"$srcdir" -o "$objdir/$(basename "$f" .c).o" "$srcdir/$f"
+        "${CC[@]}" "${extra[@]+"${extra[@]}"}" -I"$srcdir" -o "$objdir/$(basename "$f" .c).o" "$srcdir/$f"
     done
     ar rcs "$OUT/$libname" "$objdir"/*.o
     echo "-> $OUT/$libname"
@@ -138,10 +138,10 @@ LINK_EXTRA=(-Wl,--no-undefined)
 if [ "${SANITIZE:-0}" = "1" ]; then
     LINK_EXTRA=()
 fi
-gcc -shared -fPIC "${SAN_FLAGS[@]}" -o "$HERE/$SO_NAME" \
+gcc -shared -fPIC "${SAN_FLAGS[@]+"${SAN_FLAGS[@]}"}" -o "$HERE/$SO_NAME" \
     "$objdir"/*.o \
     -L "$OUT" -lndb -lbio -lauth -lsec -l9 -lpthread \
-    "${LINK_EXTRA[@]}"
+    "${LINK_EXTRA[@]+"${LINK_EXTRA[@]}"}"
 
 echo "=== done ==="
 ls -la "$OUT"/*.a "$HERE/$SO_NAME"
