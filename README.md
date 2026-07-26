@@ -14,6 +14,23 @@ or **sealed** (encrypted), with the algorithm and parameters riding inline in
 the cell. It's just a file: `cat` it, `grep` it, `git diff` it, back it up
 with `cp`.
 
+**Script it, move it, keep secrets in it** — three things you can't do all at
+once with a plain text file:
+
+- **Script it** with the usual Unix tools. The schema and non-secret rows are
+  ordinary text, so `grep`, `awk`, `cut`, `sed`, and `git diff` work on them
+  directly. (Sealed values are ciphertext by design — you can grep the labels
+  and structure, not the secrets.)
+- **Move it** anywhere as one self-describing file. Schema, and each cell's
+  crypto algorithm/parameters, ride *inside* the file — no external schema, no
+  engine, no server. `cp`/`scp`/`rsync` it; it's the same on disk, in a
+  backup, in git. Install is a single `pip install libtab` with prebuilt
+  wheels — no compiler. (Wheels currently target Linux x86_64.)
+- **Keep secrets in it.** A field can be **sealed** (XChaCha20-Poly1305, with
+  the nonce and MAC inline), so the value stays confidential at rest while the
+  rest of the table stays readable — a greppable file that still holds real
+  secrets.
+
 ## Why this exists
 
 If you want structured data on disk from Python, your options are usually:
