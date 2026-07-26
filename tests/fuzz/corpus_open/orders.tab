@@ -1,0 +1,9 @@
+schema=orders
+	col=id
+	col=item
+	col=qty
+
+id=a
+	item=widget
+	qty=5
+

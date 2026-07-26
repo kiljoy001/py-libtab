@@ -1,0 +1,14 @@
+# Ship the vendored C sources + build script in the sdist, so a
+# from-source install (no wheel available) can compile libtab.so.
+# The compiled .so itself is NOT in the sdist — it's built per-platform.
+graft vendor/plan9port/include
+graft vendor/plan9port/src
+graft vendor/libtab_c
+include vendor/plan9port/LICENSE
+include vendor/build.sh
+include README.md TESTING.md LICENSE
+
+# Exclude build artifacts that may be lying around in a dev checkout.
+global-exclude *.o *.a *.so *.pyc
+prune vendor/pic-libs
+prune vendor/pic-libs-asan

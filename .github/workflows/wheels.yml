@@ -1,0 +1,57 @@
+name: build wheels
+
+# Builds the manylinux x86_64 wheels + sdist. Runs on tags (for a
+# release) and can be triggered manually. Wheels are uploaded as build
+# artifacts; the release job (commented, opt-in) publishes to PyPI on a
+# version tag once you've set up a PyPI token.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build_wheels:
+    name: manylinux x86_64 wheels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21
+        # config (build/skip/archs/manylinux image/test-command) lives in
+        # pyproject.toml under [tool.cibuildwheel]
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: ./dist/*.tar.gz
+
+  # Uncomment and configure a PyPI trusted publisher (or PYPI_API_TOKEN
+  # secret) to auto-publish on a version tag.
+  #
+  # publish:
+  #   needs: [build_wheels, build_sdist]
+  #   runs-on: ubuntu-latest
+  #   if: startsWith(github.ref, 'refs/tags/v')
+  #   environment: pypi
+  #   permissions:
+  #     id-token: write        # for PyPI trusted publishing
+  #   steps:
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         path: dist
+  #         merge-multiple: true
+  #     - uses: pypa/gh-action-pypi-publish@release/v1

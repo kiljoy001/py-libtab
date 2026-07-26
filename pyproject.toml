@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libtab"
+version = "0.1.0"
+description = "ctypes binding to objective-9c's libtab C implementation for .tab files"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "argon2-cffi>=23.1"]
+# Security-testing toolchain (see tests/fuzz/, tests/security/,
+# tests/test_crypto_vectors.py). atheris also needs a C toolchain and,
+# for the ASan replay, libasan (system gcc).
+security = [
+    "atheris>=3.0",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+    "argon2-cffi>=23.1",  # reference impl for the argon2id known-answer test
+]
+
+[tool.setuptools.packages.find]
+include = ["libtab*"]
+
+[tool.setuptools.package-data]
+# The compiled native library, placed inside the package by setup.py's
+# build_ext, ships in the wheel.
+libtab = ["libtab.so"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+# PYI034: ruff prefers `Self` as the __enter__ return type. We keep the
+# explicit `NativeTable` return so the module stays valid on Python 3.10
+# (typing.Self is 3.11+) without pulling typing_extensions as a runtime
+# dependency. Deliberate, not an oversight.
+ignore = ["PYI034"]
+
+[tool.cibuildwheel]
+# Linux x86_64 manylinux only (see the discussion in the repo). One wheel
+# per supported CPython; the compiled .so is CPython-ABI-independent
+# (ctypes, not a C-extension) but cibuildwheel tags per interpreter.
+build = "cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux*"
+archs = ["x86_64"]
+# The manylinux image ships gcc/ar/bash — everything vendor/build.sh
+# needs. auditwheel then re-tags/repairs the wheel for manylinux.
+manylinux-x86-64-image = "manylinux2014"
+
+# After building each wheel, import it and run a real seal round-trip in a
+# fresh env — proves the bundled .so loads and the crypto works, not just
+# that the file built.
+test-command = "python -c \"import os; from libtab import seal, unseal; k=os.urandom(32); assert unseal(k, seal(k, b'ci')) == b'ci'; print('wheel smoke OK')\""

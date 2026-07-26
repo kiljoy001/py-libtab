@@ -1,0 +1,35 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.coverage
+
+# Build artifacts (the native library is compiled per-platform, never committed)
+build/
+dist/
+wheelhouse/
+*.o
+*.a
+*.so
+
+# Compiled native libraries + their object trees (vendor/build.sh output)
+vendor/libtab.so
+vendor/libtab-asan.so
+vendor/pic-libs/
+vendor/pic-libs-asan/
+
+# Mutation-testing scratch
+mutants/
+.mutmut-cache
+mutmut-stats.json
+
+# Fuzzing crash artifacts
+crash-*
+tests/fuzz/crash-*
+
+# Fuzzer-discovered corpus (40-hex names); only the named seeds are tracked
+tests/fuzz/corpus_*/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*
