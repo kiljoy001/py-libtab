@@ -122,7 +122,7 @@ build_lib libsec.a "$SRC/libsec/port" "${LIBSEC[@]}"
 LIBTAB_SRC="$HERE/libtab_c"
 LIBTAB_OFILES=(tab_codec.c tab_create.c tab_error.c tab_hashed.c tab_iter.c
     tab_open.c tab_persist.c tab_row.c tab_rowmap.c tab_serialize.c
-    tab_signed.c monocypher.c stub_9pclient.c)
+    tab_signed.c monocypher.c stub_9pclient.c getrandom_compat.c)
 objdir="$OUT/obj-libtab"
 mkdir -p "$objdir"
 echo "=== libtab (${#LIBTAB_OFILES[@]} files) ==="

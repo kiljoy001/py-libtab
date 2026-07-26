@@ -27,6 +27,14 @@ nsmount(char *name, char *aname)
 }
 
 CFid*
+fsopen(CFsys *fs, char *name, int mode)
+{
+	USED(fs); USED(name); USED(mode);
+	werrstr("fsopen: 9P client support not linked into this build");
+	return nil;
+}
+
+CFid*
 fscreate(CFsys *fs, char *name, int mode, ulong perm)
 {
 	USED(fs); USED(name); USED(mode); USED(perm);
