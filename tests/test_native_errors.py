@@ -90,6 +90,32 @@ def test_open_quoted_space_value_round_trips(tmp_path):
     t2.close()
 
 
+def test_leading_hash_value_is_dropped_as_comment(tmp_path):
+    # Known ndb-grammar constraint (documents the behavior, does not "fix"
+    # it — the writer trusts the caller with representation). A value that
+    # STARTS with '#' is parsed as an ndb comment on read, so it comes back
+    # empty. Unlike the unquoted-space case (which fails to open), this
+    # loses data silently — callers must avoid a leading '#' or quote it.
+    path = tmp_path / "hash.tab"
+    t = native.Tabula.create(str(path), "t", [native.Column("id"), native.Column("v")])
+    r = t.add_row("id", "x")
+    t.set(r, "v", "#abc")
+    t.commit()
+    t.close()
+    t2 = native.Tabula.open(str(path))
+    r2 = t2.search("id", "x")[0]
+    assert t2.get(r2, "v") == ""          # dropped as a comment
+    t2.close()
+    # '#' mid-value is fine — only a leading '#' is reserved.
+    t3 = native.Tabula.create(str(tmp_path / "mid.tab"), "t", [native.Column("v")])
+    rr = t3.add_row("v", "a#b")
+    t3.commit()
+    t3.close()
+    t4 = native.Tabula.open(str(tmp_path / "mid.tab"))
+    assert t4.get(t4.iter_rows()[0], "v") == "a#b"
+    t4.close()
+
+
 def test_commit_to_missing_parent_dir_raises(tmp_path):
     # create() only builds the in-memory Tab; the filesystem write
     # happens at commit(). libtab.c's local-write path (tab_persist.c)

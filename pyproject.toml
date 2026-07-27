@@ -26,7 +26,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7.0", "argon2-cffi>=23.1"]
+test = ["pytest>=7.0", "hypothesis>=6.0", "argon2-cffi>=23.1"]
 # Security-testing toolchain (see tests/fuzz/, tests/security/,
 # tests/test_crypto_vectors.py). atheris also needs a C toolchain and,
 # for the ASan replay, libasan (system gcc).
