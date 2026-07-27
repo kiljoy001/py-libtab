@@ -16,7 +16,6 @@ The story, in one screen:
 No database, no server. Just a file. pip install libtab.
 """
 import os
-import tempfile
 import time
 
 from libtab import Column, Tabula, keypair, native
@@ -38,7 +37,10 @@ def step(n: int, title: str) -> None:
 
 
 def main() -> None:
-    path = os.path.join(tempfile.mkdtemp(), "payment.tab")
+    # Write to the current directory (not a temp dir) and DON'T delete it —
+    # the whole point is a file you can cat, grep, and edit yourself. The
+    # demo hands it to you at the end.
+    path = os.path.join(os.getcwd(), "payment.tab")
     # The CFO holds the secret key and signs the amount; anyone with the
     # public key can verify it, but nobody can forge a new signature.
     cfo_sk, cfo_pk = keypair()
@@ -108,8 +110,14 @@ def main() -> None:
         t.close()
 
     print(f"\n{B}{G}The record proved its own tampering — from a plain text file.{X}")
-    print(f"{DIM}No database. No server. pip install libtab.{X}\n")
-    os.remove(path)
+    print(f"{DIM}No database. No server. pip install libtab.{X}")
+
+    # Leave the file behind and point at it — inspecting it is the point.
+    # (Note: the amount now reads 9000 on disk from step 4's edit, but the
+    # signature no longer verifies — that's exactly what step 5 showed.)
+    print(f"\n{B}The file is yours to inspect:{X} {C}{path}{X}")
+    print(f"  {DIM}cat  {path}{X}")
+    print(f"  {DIM}grep sealed {path}   # find the secret's location, not its value{X}\n")
 
 
 if __name__ == "__main__":
