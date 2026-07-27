@@ -88,9 +88,9 @@ lib.crypto_eddsa_key_pair(sk_buf, pk_buf, seed_buf)
 
 with tempfile.TemporaryDirectory() as d:
     path = os.path.join(d, "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
     t.set_signed(r, "body", b"hello", bytes(sk_buf))
@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory() as d:
     t.commit()
     t.close()
 
-    t2 = native.NativeTable.open(path)
+    t2 = native.Tabula.open(path)
     assert t2.schema_name == "t"
     rows = t2.iter_rows()
     assert len(rows) == 1
@@ -120,7 +120,7 @@ for bad in (None, 0, 11, 4095, "notanint"):
     try:
         native._string_at(bad)
         raise SystemExit(f"_string_at({bad!r}) did not raise")
-    except native.LibtabNativeError:
+    except native.TabulaError:
         pass
 
 # non-null argtype guards, exercised through real C entry points
@@ -153,7 +153,7 @@ for fn, args in [
 import os, tempfile
 with tempfile.TemporaryDirectory() as d:
     path = os.path.join(d, "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     t.add_row("id", "a")
     t.commit()
     t.close()
@@ -161,20 +161,20 @@ with tempfile.TemporaryDirectory() as d:
     try:
         t.colname(0)
         raise SystemExit("closed-table access did not raise")
-    except native.LibtabNativeError:
+    except native.TabulaError:
         pass
 
 # freed-row guard: use-after-free prevention after remove_row
 with tempfile.TemporaryDirectory() as d:
     path = os.path.join(d, "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     r = t.add_row("id", "a")
     t.remove_row(r)
     assert r._freed is True
     try:
         t.get(r, "id")
         raise SystemExit("freed-row access did not raise")
-    except native.LibtabNativeError:
+    except native.TabulaError:
         pass
     t.close()
 """

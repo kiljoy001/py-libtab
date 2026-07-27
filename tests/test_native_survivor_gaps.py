@@ -18,8 +18,8 @@ if not os.path.exists(
 ):
     pytest.skip("vendor/libtab.so not built — run vendor/build.sh", allow_module_level=True)
 
-Col = native.NativeColumn
-Tab = native.NativeTable
+Col = native.Column
+Tab = native.Tabula
 
 
 # --- create: column-spec fields (type/algo/signer) must reach _TabColSpec ---
@@ -137,28 +137,28 @@ def force_error(monkeypatch):
 
 def test_create_context_on_failure(force_error, monkeypatch, tmp_path):
     monkeypatch.setattr(force_error, "tab_create", lambda *a: None)
-    with pytest.raises(native.LibtabNativeError, match=r"^tab_create:"):
+    with pytest.raises(native.TabulaError, match=r"^tab_create:"):
         Tab.create(str(tmp_path / "t.tab"), "t", [Col("id")])
 
 
 def test_add_row_context_on_failure(force_error, monkeypatch, tmp_path):
     t = Tab.create(str(tmp_path / "t.tab"), "t", [Col("id")])
     monkeypatch.setattr(force_error, "tab_add_row", lambda *a: None)
-    with pytest.raises(native.LibtabNativeError, match=r"^tab_add_row:"):
+    with pytest.raises(native.TabulaError, match=r"^tab_add_row:"):
         t.add_row("id", "a")
 
 
 def test_iter_rows_context_on_failure(force_error, monkeypatch, tmp_path):
     t = Tab.create(str(tmp_path / "t.tab"), "t", [Col("id")])
     monkeypatch.setattr(force_error, "tab_iter", lambda *a: None)
-    with pytest.raises(native.LibtabNativeError, match=r"^tab_iter:"):
+    with pytest.raises(native.TabulaError, match=r"^tab_iter:"):
         t.iter_rows()
 
 
 def test_search_context_on_failure(force_error, monkeypatch, tmp_path):
     t = Tab.create(str(tmp_path / "t.tab"), "t", [Col("id")])
     monkeypatch.setattr(force_error, "tab_search", lambda *a: None)
-    with pytest.raises(native.LibtabNativeError, match=r"^tab_search:"):
+    with pytest.raises(native.TabulaError, match=r"^tab_search:"):
         t.search("id", "a")
 
 
@@ -166,11 +166,11 @@ def test_remove_row_context_on_failure(force_error, monkeypatch, tmp_path):
     t = Tab.create(str(tmp_path / "t.tab"), "t", [Col("id")])
     r = t.add_row("id", "a")
     monkeypatch.setattr(force_error, "tab_remove_row", lambda *a: -1)
-    with pytest.raises(native.LibtabNativeError, match=r"^tab_remove_row:"):
+    with pytest.raises(native.TabulaError, match=r"^tab_remove_row:"):
         t.remove_row(r)
 
 
 def test_b64_encode_context_on_failure(force_error, monkeypatch):
     monkeypatch.setattr(force_error, "tab_b64_encode", lambda *a: None)
-    with pytest.raises(native.LibtabNativeError, match=r"^tab_b64_encode:"):
+    with pytest.raises(native.TabulaError, match=r"^tab_b64_encode:"):
         native.b64_encode(b"x")

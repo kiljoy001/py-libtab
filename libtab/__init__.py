@@ -9,17 +9,17 @@ than ship a second, subtly-incompatible implementation of a format whose
 whole point is exact interop with the C/Go implementations, this package
 now wraps the actual C source directly.
 
-See libtab.native for NativeTable and friends. Requires vendor/libtab.so
-to be built first — run vendor/build.sh (needs a C toolchain; see
-vendor/README).
+See libtab.native for the Tabula type and friends. Requires
+vendor/libtab.so to be built first — run vendor/build.sh (needs a C
+toolchain; see vendor/README).
 """
 
 from .native import (
-    LibtabNativeError,
-    NativeColumn,
-    NativeRow,
-    NativeTable,
-    NativeUnavailable,
+    TabulaError,
+    Column,
+    Row,
+    Tabula,
+    TabulaUnavailable,
     b64_decode,
     b64_encode,
     keypair,
@@ -27,15 +27,33 @@ from .native import (
     unseal,
 )
 
+# Deprecated 0.1.0 names. The public types were renamed to o9's Tabula
+# vocabulary (a .tab file is a Tabula); the old "Native*" names only ever
+# distinguished the FFI backend from a since-removed pure-Python one, so
+# they leaked a dead implementation detail. Kept as aliases so 0.1.0
+# imports don't hard-break; prefer the new names — these will be removed
+# in a future release.
+NativeTable = Tabula
+NativeColumn = Column
+NativeRow = Row
+NativeError = TabulaError
+NativeUnavailable = TabulaUnavailable
+
 __all__ = [
-    "LibtabNativeError",
-    "NativeColumn",
-    "NativeRow",
-    "NativeTable",
-    "NativeUnavailable",
+    "TabulaError",
+    "Column",
+    "Row",
+    "Tabula",
+    "TabulaUnavailable",
     "b64_decode",
     "b64_encode",
     "keypair",
     "seal",
     "unseal",
+    # deprecated aliases
+    "NativeTable",
+    "NativeColumn",
+    "NativeRow",
+    "NativeError",
+    "NativeUnavailable",
 ]

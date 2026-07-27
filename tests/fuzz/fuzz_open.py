@@ -1,4 +1,4 @@
-"""Atheris fuzz harness: NativeTable.open() on arbitrary .tab bytes.
+"""Atheris fuzz harness: Tabula.open() on arbitrary .tab bytes.
 
 This is the primary memory-safety target. A .tab file is untrusted input
 (per docs/TABULA.md it crosses the network as a data envelope), and
@@ -16,7 +16,7 @@ crash, not silent corruption:
     .venv/bin/python tests/fuzz/fuzz_open.py -atheris_runs=200000 \
         tests/fuzz/corpus_open
 
-A LibtabNativeError / UnicodeDecodeError / OSError is expected, valid
+A TabulaError / UnicodeDecodeError / OSError is expected, valid
 behavior on garbage input and is swallowed. Anything else — a segfault,
 an ASan report, a hang — is a real finding.
 """
@@ -38,12 +38,12 @@ def _one(data: bytes) -> None:
         os.write(fd, data)
         os.close(fd)
         try:
-            t = native.NativeTable.open(path)
-        except (native.LibtabNativeError, UnicodeDecodeError, OSError, ValueError):
+            t = native.Tabula.open(path)
+        except (native.TabulaError, UnicodeDecodeError, OSError, ValueError):
             return  # expected rejections of malformed input
         # If it parsed, exercise the read paths too — those also touch C.
         # UnicodeDecodeError is expected here too: libtab cells are raw
-        # bytes, and NativeTable.get()/colname() decode as UTF-8, so a
+        # bytes, and Tabula.get()/colname() decode as UTF-8, so a
         # non-UTF-8 cell legitimately raises it (a Python-layer API fact,
         # not a memory bug). Swallow it so the fuzzer keeps hunting for
         # actual C-level faults.

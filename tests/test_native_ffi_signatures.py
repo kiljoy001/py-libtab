@@ -179,10 +179,10 @@ def test_find_so_prefers_in_package_wheel_location(tmp_path):
 
 def test_find_so_raises_when_missing(monkeypatch):
     """Kills the `os.path.exists(None)` mutant: with a path that does not
-    exist, _find_so must raise NativeUnavailable — proving the existence
+    exist, _find_so must raise TabulaUnavailable — proving the existence
     check runs against the real candidate, not a constant."""
     monkeypatch.setattr(native.os.path, "exists", lambda p: False)
-    with pytest.raises(native.NativeUnavailable):
+    with pytest.raises(native.TabulaUnavailable):
         native._find_so()
 
 
@@ -202,7 +202,7 @@ def test_find_so_override_must_exist(tmp_path, monkeypatch):
     through to the default. Kills the `if os.path.exists(override)` and
     `os.path.exists(None)` mutants on the override branch."""
     monkeypatch.setenv("LIBTAB_SO", str(tmp_path / "nope.so"))
-    with pytest.raises(native.NativeUnavailable, match="LIBTAB_SO"):
+    with pytest.raises(native.TabulaUnavailable, match="LIBTAB_SO"):
         native._find_so()
 
 

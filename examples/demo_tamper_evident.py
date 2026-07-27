@@ -19,7 +19,7 @@ import os
 import tempfile
 import time
 
-from libtab import NativeColumn, NativeTable, keypair, native
+from libtab import Column, Tabula, keypair, native
 
 # ── colours for a recordable terminal ─────────────────────────────────
 G, R, Y, C, DIM, B, X = (
@@ -49,10 +49,10 @@ def main() -> None:
 
     # ── 1. write ──────────────────────────────────────────────────────
     step(1, "Write a payment record")
-    t = NativeTable.create(path, "payments", [
-        NativeColumn("payee"),
-        NativeColumn("amount", type="SIGNED", signer="cfo"),   # signed by the CFO
-        NativeColumn("account_token"),                          # will be sealed
+    t = Tabula.create(path, "payments", [
+        Column("payee"),
+        Column("amount", type="SIGNED", signer="cfo"),   # signed by the CFO
+        Column("account_token"),                          # will be sealed
     ])
     row = t.add_row("payee", "Widget-LLC")
     t.set_signed(row, "amount", b"1000", cfo_sk)               # CFO signs "1000"
@@ -72,7 +72,7 @@ def main() -> None:
 
     # ── 3. read it back honestly ──────────────────────────────────────
     step(3, "Read it back — everything checks out")
-    t = NativeTable.open(path)
+    t = Tabula.open(path)
     r = t.search("payee", "Widget-LLC")[0]
     amount = t.verify_signed(r, "amount", cfo_pk)              # raises if forged
     token = t.get_sealed(r, "account_token", vault_key)
@@ -95,12 +95,12 @@ def main() -> None:
 
     # ── 5. the file catches it ────────────────────────────────────────
     step(5, "Read it back again")
-    t = NativeTable.open(path)
+    t = Tabula.open(path)
     r = t.search("payee", "Widget-LLC")[0]
     try:
         t.verify_signed(r, "amount", cfo_pk)
         print(f"  {R}(should not reach here){X}")
-    except native.LibtabNativeError as e:
+    except native.TabulaError as e:
         print(f"  {R}{B}>>> SIGNATURE CHECK FAILED <<<{X}")
         print(f"  {R}✘ the file rejected the forged amount{X}")
         print(f"    {DIM}{e}{X}")

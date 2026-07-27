@@ -20,8 +20,8 @@ if not os.path.exists(
 ):
     pytest.skip("vendor/libtab.so not built — run vendor/build.sh", allow_module_level=True)
 
-Col = native.NativeColumn
-Tab = native.NativeTable
+Col = native.Column
+Tab = native.Tabula
 KEY = bytes(range(32))
 
 
@@ -56,21 +56,21 @@ def test_seal_fresh_nonce_each_call():
 
 def test_unseal_wrong_key_raises():
     blob = native.seal(KEY, b"secret")
-    with pytest.raises(native.LibtabNativeError, match="wrong key or tampered"):
+    with pytest.raises(native.TabulaError, match="wrong key or tampered"):
         native.unseal(os.urandom(32), blob)
 
 
 def test_unseal_tampered_blob_raises():
     blob = bytearray(native.seal(KEY, b"secret"))
     blob[-1] ^= 1  # flip a ciphertext bit
-    with pytest.raises(native.LibtabNativeError, match="wrong key or tampered"):
+    with pytest.raises(native.TabulaError, match="wrong key or tampered"):
         native.unseal(KEY, bytes(blob))
 
 
 def test_unseal_tampered_nonce_raises():
     blob = bytearray(native.seal(KEY, b"secret"))
     blob[0] ^= 1  # flip a nonce bit
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         native.unseal(KEY, bytes(blob))
 
 
@@ -80,18 +80,18 @@ def test_seal_empty_plaintext():
 
 
 def test_seal_rejects_wrong_key_length():
-    with pytest.raises(native.LibtabNativeError, match="32 bytes"):
+    with pytest.raises(native.TabulaError, match="32 bytes"):
         native.seal(b"short", b"x")
 
 
 def test_unseal_rejects_wrong_key_length():
     blob = native.seal(KEY, b"x")
-    with pytest.raises(native.LibtabNativeError, match="32 bytes"):
+    with pytest.raises(native.TabulaError, match="32 bytes"):
         native.unseal(b"short", blob)
 
 
 def test_unseal_rejects_short_blob():
-    with pytest.raises(native.LibtabNativeError, match="too short"):
+    with pytest.raises(native.TabulaError, match="too short"):
         native.unseal(KEY, b"tiny")
 
 
@@ -173,7 +173,7 @@ def test_get_sealed_wrong_key_raises(tmp_path):
     t = Tab.create(path, "t", [Col("id"), Col("secret")])
     r = t.add_row("id", "a")
     t.set_sealed(r, "secret", b"secret", KEY)
-    with pytest.raises(native.LibtabNativeError, match="wrong key or tampered"):
+    with pytest.raises(native.TabulaError, match="wrong key or tampered"):
         t.get_sealed(r, "secret", os.urandom(32))
     t.close()
 
@@ -183,7 +183,7 @@ def test_get_sealed_on_unsealed_cell_raises(tmp_path):
     t = Tab.create(path, "t", [Col("id"), Col("plain")])
     r = t.add_row("id", "a")
     t.set(r, "plain", "just text")
-    with pytest.raises(native.LibtabNativeError, match="not a sealed value"):
+    with pytest.raises(native.TabulaError, match="not a sealed value"):
         t.get_sealed(r, "plain", KEY)
     t.close()
 
@@ -192,6 +192,6 @@ def test_get_sealed_on_missing_cell_raises(tmp_path):
     path = str(tmp_path / "t.tab")
     t = Tab.create(path, "t", [Col("id"), Col("secret")])
     r = t.add_row("id", "a")  # secret never set
-    with pytest.raises(native.LibtabNativeError, match="not a sealed value"):
+    with pytest.raises(native.TabulaError, match="not a sealed value"):
         t.get_sealed(r, "secret", KEY)
     t.close()

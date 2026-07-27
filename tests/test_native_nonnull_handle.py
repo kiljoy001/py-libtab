@@ -41,12 +41,12 @@ def test_nonnull_handle_accepts_real_pointer():
 
 
 def test_nonnull_handle_rejects_none():
-    with pytest.raises(native.LibtabNativeError, match="null handle"):
+    with pytest.raises(native.TabulaError, match="null handle"):
         native._NonNullHandle.from_param(None)
 
 
 def test_nonnull_charp_rejects_none():
-    with pytest.raises(native.LibtabNativeError, match="null string"):
+    with pytest.raises(native.TabulaError, match="null string"):
         native._NonNullCharP.from_param(None)
 
 
@@ -55,7 +55,7 @@ def test_nonnull_charp_accepts_bytes():
 
 
 def test_nonnull_intp_rejects_none():
-    with pytest.raises(native.LibtabNativeError, match="out-parameter"):
+    with pytest.raises(native.TabulaError, match="out-parameter"):
         native._NonNullIntP.from_param(None)
 
 

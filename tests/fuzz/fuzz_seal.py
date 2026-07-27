@@ -22,12 +22,12 @@ def _one(data: bytes) -> None:
     # forged/malformed and must raise cleanly, never crash.
     try:
         native.unseal(_KEY, data)
-    except native.LibtabNativeError:
+    except native.TabulaError:
         pass
     # also fuzz the seal→unseal round-trip (exercises the AEAD buffers)
     try:
         native.unseal(_KEY, native.seal(_KEY, data))
-    except native.LibtabNativeError:
+    except native.TabulaError:
         pass
 
 

@@ -26,20 +26,20 @@ def test_native_unavailable_when_so_missing(monkeypatch):
     monkeypatch.setattr(
         native.os.path, "exists", lambda p: False
     )
-    with pytest.raises(native.NativeUnavailable):
+    with pytest.raises(native.TabulaUnavailable):
         native._find_so()
 
 
 def test_open_missing_file_raises(tmp_path):
-    with pytest.raises(native.LibtabNativeError):
-        native.NativeTable.open(str(tmp_path / "does_not_exist.tab"))
+    with pytest.raises(native.TabulaError):
+        native.Tabula.open(str(tmp_path / "does_not_exist.tab"))
 
 
 def test_open_malformed_file_raises(tmp_path):
     path = tmp_path / "bad.tab"
     path.write_text("this is not ndb-shaped schema data\n")
-    with pytest.raises(native.LibtabNativeError):
-        native.NativeTable.open(str(path))
+    with pytest.raises(native.TabulaError):
+        native.Tabula.open(str(path))
 
 
 def test_open_hint_recognises_undeclared_column():
@@ -59,9 +59,9 @@ def test_open_unquoted_space_value_gives_hint(tmp_path):
     # A value with a space parses as two ndb tuples; the second word looks
     # like an undeclared column. open() should surface the space-quoting hint.
     path = tmp_path / "spacey.tab"
-    t = native.NativeTable.create(
+    t = native.Tabula.create(
         str(path), "payments",
-        [native.NativeColumn("payee"), native.NativeColumn("amount")],
+        [native.Column("payee"), native.Column("amount")],
     )
     r = t.add_row("payee", "Widget")
     t.set(r, "amount", "1000")
@@ -70,8 +70,8 @@ def test_open_unquoted_space_value_gives_hint(tmp_path):
     # Inject the footgun: an unquoted space in the head value on disk.
     text = path.read_text().replace("payee=Widget", "payee=Widget LLC")
     path.write_text(text)
-    with pytest.raises(native.LibtabNativeError) as excinfo:
-        native.NativeTable.open(str(path))
+    with pytest.raises(native.TabulaError) as excinfo:
+        native.Tabula.open(str(path))
     assert "unquoted" in str(excinfo.value)
 
 
@@ -79,13 +79,13 @@ def test_open_quoted_space_value_round_trips(tmp_path):
     # The correct form: a double-quoted value with a space opens cleanly and
     # the quotes are stripped on read.
     path = tmp_path / "quoted.tab"
-    t = native.NativeTable.create(
-        str(path), "payments", [native.NativeColumn("payee")],
+    t = native.Tabula.create(
+        str(path), "payments", [native.Column("payee")],
     )
     t.add_row("payee", '"Widget LLC"')
     t.commit()
     t.close()
-    t2 = native.NativeTable.open(str(path))
+    t2 = native.Tabula.open(str(path))
     assert t2.get(t2.iter_rows()[0], "payee") == "Widget LLC"
     t2.close()
 
@@ -95,28 +95,28 @@ def test_commit_to_missing_parent_dir_raises(tmp_path):
     # happens at commit(). libtab.c's local-write path (tab_persist.c)
     # does NOT create missing parent directories — unlike a naive
     # implementation might assume, this must raise, not silently mkdir.
-    t = native.NativeTable.create(
-        str(tmp_path / "sub" / "orders.tab"), "orders", [native.NativeColumn("id")]
+    t = native.Tabula.create(
+        str(tmp_path / "sub" / "orders.tab"), "orders", [native.Column("id")]
     )
     t.add_row("id", "a")
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.commit()
     t.close()
 
 
 def test_set_unknown_column_raises(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     r = t.add_row("id", "a")
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.set(r, "nosuchcolumn", "x")
     t.close()
 
 
 def test_clear_cell(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("k"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("k"),
     ])
     r = t.add_row("id", "a")
     t.set(r, "k", "x")
@@ -128,26 +128,26 @@ def test_clear_cell(tmp_path):
 
 def test_clear_unknown_column_raises(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     r = t.add_row("id", "a")
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.clear(r, "nosuchcolumn")
     t.close()
 
 
 def test_remove_row_twice_raises(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     r = t.add_row("id", "a")
     t.remove_row(r)
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.remove_row(r)
     t.close()
 
 
 def test_remove_row_drops_from_iteration(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     r1 = t.add_row("id", "a")
     t.add_row("id", "b")
     assert r1._freed is False
@@ -160,7 +160,7 @@ def test_remove_row_drops_from_iteration(tmp_path):
 
 def test_context_manager_closes(tmp_path):
     path = str(tmp_path / "t.tab")
-    with native.NativeTable.create(path, "t", [native.NativeColumn("id")]) as t:
+    with native.Tabula.create(path, "t", [native.Column("id")]) as t:
         t.add_row("id", "a")
         t.commit()
         assert t._closed is False
@@ -169,7 +169,7 @@ def test_context_manager_closes(tmp_path):
 
 def test_close_is_idempotent(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     t.add_row("id", "a")
     t.commit()
     t.close()
@@ -178,9 +178,9 @@ def test_close_is_idempotent(tmp_path):
 
 def test_schema_introspection(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("pwhash", type="HASHED", algo="argon2id"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("pwhash", type="HASHED", algo="argon2id"),
     ])
     assert t.ncolumns == 2
     assert t.colname(0) == "id"
@@ -196,8 +196,8 @@ def test_schema_introspection(tmp_path):
 
 def test_get_missing_cell_returns_none(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("k"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("k"),
     ])
     r = t.add_row("id", "a")
     assert t.get(r, "k") is None
@@ -206,8 +206,8 @@ def test_get_missing_cell_returns_none(tmp_path):
 
 def test_search_no_matches_returns_empty(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("k"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("k"),
     ])
     t.add_row("id", "a")
     assert t.search("k", "nomatch") == []
@@ -217,9 +217,9 @@ def test_search_no_matches_returns_empty(tmp_path):
 def test_set_hashed_argon2id(tmp_path):
     pytest.importorskip("argon2")  # confirms C lib's argon2 support works too
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("pwhash", type="HASHED", algo="argon2id"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("pwhash", type="HASHED", algo="argon2id"),
     ])
     r = t.add_row("id", "a")
     t.set_hashed_argon2id(r, "pwhash", b"secret123")
@@ -230,11 +230,11 @@ def test_set_hashed_argon2id(tmp_path):
 
 def test_set_hashed_argon2id_wrong_column_type_raises(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("plain"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("plain"),
     ])
     r = t.add_row("id", "a")
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.set_hashed_argon2id(r, "plain", b"secret123")
     t.close()
 
@@ -243,12 +243,12 @@ def test_verify_hash_on_empty_cell_returns_false(tmp_path):
     """tab_verify_hash returns 0 (not -1) for an empty cell — the C
     library treats "nothing to compare against" as a non-match, not an
     error, even though it also calls tab_seterror internally. The
-    NativeTable.verify_hash bool return only escalates rc < 0 to an
+    Tabula.verify_hash bool return only escalates rc < 0 to an
     exception, matching the C API's own success/failure boundary."""
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("pwhash", type="HASHED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("pwhash", type="HASHED"),
     ])
     r = t.add_row("id", "a")  # pwhash never set — empty cell
     assert t.verify_hash(r, "pwhash", b"secret123") is False
@@ -264,9 +264,9 @@ def test_verify_hash_malformed_cell_raises(tmp_path):
         "schema=t\n\tcol=id\n\tcol=pwhash type=HASHED\n\n"
         "id=a\n\tpwhash=hashed:not-valid-base64!!!\n\n"
     )
-    t = native.NativeTable.open(str(path))
+    t = native.Tabula.open(str(path))
     r = t.iter_rows()[0]
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.verify_hash(r, "pwhash", b"secret123")
     t.close()
 
@@ -275,34 +275,34 @@ def test_set_signed_wrong_column_type_raises(tmp_path):
     from tests.conftest import monocypher_keypair as _monocypher_keypair
 
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("plain"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("plain"),
     ])
     r = t.add_row("id", "a")
     sk, _pk = _monocypher_keypair(bytes(range(32)))
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.set_signed(r, "plain", b"hello", sk)
     t.close()
 
 
 def test_set_hashed_wrong_column_type_raises(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("plain"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("plain"),
     ])
     r = t.add_row("id", "a")
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.set_hashed(r, "plain", b"secret123")
     t.close()
 
 
 def test_set_signed_rejects_short_key(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
-    with pytest.raises(native.LibtabNativeError, match="64 bytes"):
+    with pytest.raises(native.TabulaError, match="64 bytes"):
         t.set_signed(r, "body", b"hello", b"short")
     t.close()
 
@@ -311,13 +311,13 @@ def test_verify_signed_rejects_short_key(tmp_path):
     from tests.conftest import monocypher_keypair as _monocypher_keypair
 
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
     sk, _pk = _monocypher_keypair(bytes(range(32)))
     t.set_signed(r, "body", b"hello", sk)
-    with pytest.raises(native.LibtabNativeError, match="32 bytes"):
+    with pytest.raises(native.TabulaError, match="32 bytes"):
         t.verify_signed(r, "body", b"short")
     t.close()
 
@@ -326,25 +326,25 @@ def test_verify_signed_wrong_key_raises(tmp_path):
     from tests.conftest import monocypher_keypair as _monocypher_keypair
 
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
     sk, _pk = _monocypher_keypair(bytes(range(32)))
     _sk2, pk2 = _monocypher_keypair(bytes([9] * 32))
     t.set_signed(r, "body", b"hello", sk)
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t.verify_signed(r, "body", pk2)
     t.close()
 
 
 def test_b64_decode_invalid_input_raises():
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         native.b64_decode("not valid base64!!!")
 
 
 def test_iter_rows_empty_table(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [native.NativeColumn("id")])
+    t = native.Tabula.create(path, "t", [native.Column("id")])
     assert t.iter_rows() == []
     t.close()

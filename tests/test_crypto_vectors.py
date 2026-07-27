@@ -150,13 +150,13 @@ def test_argon2id_matches_reference(tmp_path):
     pytest.importorskip("argon2")
     from argon2.low_level import Type, hash_secret_raw
 
-    from libtab.native import NativeColumn, NativeTable
+    from libtab.native import Column, Tabula
 
     preimage = b"correct horse battery staple"
     path = str(tmp_path / "t.tab")
-    t = NativeTable.create(path, "t", [
-        NativeColumn("id"),
-        NativeColumn("pw", type="HASHED", algo="argon2id"),
+    t = Tabula.create(path, "t", [
+        Column("id"),
+        Column("pw", type="HASHED", algo="argon2id"),
     ])
     r = t.add_row("id", "a")
     t.set_hashed_argon2id(r, "pw", preimage)

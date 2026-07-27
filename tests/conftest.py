@@ -52,10 +52,10 @@ def signed_table(tmp_path):
     one row keyed id=a. Returns (table, row)."""
     from libtab import native
 
-    t = native.NativeTable.create(
+    t = native.Tabula.create(
         str(tmp_path / "t.tab"),
         "t",
-        [native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED")],
+        [native.Column("id"), native.Column("body", type="SIGNED")],
     )
     r = t.add_row("id", "a")
     yield t, r
@@ -68,10 +68,10 @@ def hashed_table(tmp_path):
     one row keyed id=a. Returns (table, row)."""
     from libtab import native
 
-    t = native.NativeTable.create(
+    t = native.Tabula.create(
         str(tmp_path / "t.tab"),
         "t",
-        [native.NativeColumn("id"), native.NativeColumn("pwhash", type="HASHED")],
+        [native.Column("id"), native.Column("pwhash", type="HASHED")],
     )
     r = t.add_row("id", "a")
     yield t, r

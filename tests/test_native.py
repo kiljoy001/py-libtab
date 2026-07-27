@@ -21,11 +21,11 @@ if not os.path.exists(
 
 def test_create_add_commit_reopen(tmp_path):
     path = str(tmp_path / "orders.tab")
-    t = native.NativeTable.create(path, "orders", [
-        native.NativeColumn("id"),
-        native.NativeColumn("item"),
-        native.NativeColumn("qty"),
-        native.NativeColumn("status"),
+    t = native.Tabula.create(path, "orders", [
+        native.Column("id"),
+        native.Column("item"),
+        native.Column("qty"),
+        native.Column("status"),
     ])
     r = t.add_row("id", "a")
     t.set(r, "item", "widget")
@@ -34,7 +34,7 @@ def test_create_add_commit_reopen(tmp_path):
     t.commit()
     t.close()
 
-    t2 = native.NativeTable.open(path)
+    t2 = native.Tabula.open(path)
     assert t2.schema_name == "orders"
     assert t2.ncolumns == 4
     rows = t2.iter_rows()
@@ -45,8 +45,8 @@ def test_create_add_commit_reopen(tmp_path):
 
 def test_search(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("k"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("k"),
     ])
     for rid, k in [("a", "x"), ("b", "y"), ("c", "x")]:
         r = t.add_row("id", rid)
@@ -60,8 +60,8 @@ def test_search(tmp_path):
 
 def test_serialized_output_shape(tmp_path):
     path = str(tmp_path / "orders.tab")
-    nt = native.NativeTable.create(path, "orders", [
-        native.NativeColumn("id"), native.NativeColumn("item"),
+    nt = native.Tabula.create(path, "orders", [
+        native.Column("id"), native.Column("item"),
     ])
     r = nt.add_row("id", "a")
     nt.set(r, "item", "widget")
@@ -78,9 +78,9 @@ def test_serialized_output_shape(tmp_path):
 
 def test_hashed_blake2b_roundtrip(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("pwhash", type="HASHED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("pwhash", type="HASHED"),
     ])
     r = t.add_row("id", "a")
     t.set_hashed(r, "pwhash", b"secret123")
@@ -96,9 +96,9 @@ from tests.conftest import monocypher_keypair as _monocypher_keypair
 
 def test_signed_roundtrip(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
 

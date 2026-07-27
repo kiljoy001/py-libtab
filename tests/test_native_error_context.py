@@ -1,6 +1,6 @@
 """Assert the context prefix in every reachable _check_error failure.
 
-_check_error raises `LibtabNativeError(f"{context}: {msg}")`. Mutation
+_check_error raises `TabulaError(f"{context}: {msg}")`. Mutation
 testing tampered the `context` literal (e.g. "tab_set_signed" →
 "XXtab_set_signedXX") at each call site and those survived, because the
 existing failure-path tests only asserted that *something* raised, not
@@ -22,9 +22,9 @@ if not os.path.exists(
 ):
     pytest.skip("vendor/libtab.so not built — run vendor/build.sh", allow_module_level=True)
 
-Col = native.NativeColumn
-Tab = native.NativeTable
-Err = native.LibtabNativeError
+Col = native.Column
+Tab = native.Tabula
+Err = native.TabulaError
 
 
 def _assert_context(exc_info, context: str) -> None:

@@ -24,11 +24,11 @@ import secrets
 from dataclasses import dataclass
 
 
-class NativeUnavailable(RuntimeError):
+class TabulaUnavailable(RuntimeError):
     pass
 
 
-class LibtabNativeError(RuntimeError):
+class TabulaError(RuntimeError):
     pass
 
 
@@ -56,7 +56,7 @@ class _NonNullHandle(ctypes.c_void_p):
             # message text is a pure diagnostic (not behavior); the
             # trailing pragma suppresses mutmut's XX-wrap/case-flip
             # string mutations, which are not worth killing.
-            raise LibtabNativeError("internal error: attempted to pass a null handle to a libtab C function that requires a live Tab/TabRow/TabIter — refusing rather than risking a segfault")  # pragma: no mutate
+            raise TabulaError("internal error: attempted to pass a null handle to a libtab C function that requires a live Tab/TabRow/TabIter — refusing rather than risking a segfault")  # pragma: no mutate
         # pragma: no mutate — this line is the dispatch point between
         # the validated value and ctypes' raw pointer marshaling; its only
         # observable failure mode is a process crash (a NULL reaches C),
@@ -76,7 +76,7 @@ class _NonNullCharP(ctypes.c_char_p):
     @classmethod
     def from_param(cls, value):
         if value is None:
-            raise LibtabNativeError("internal error: attempted to pass a null string to a libtab C function that requires one — refusing rather than risking a segfault")  # pragma: no mutate
+            raise TabulaError("internal error: attempted to pass a null string to a libtab C function that requires one — refusing rather than risking a segfault")  # pragma: no mutate
         # pragma: no mutate — dispatch point; see _NonNullHandle.from_param.
         return super().from_param(value)  # pragma: no mutate
 
@@ -93,7 +93,7 @@ class _NonNullIntP:
     @classmethod
     def from_param(cls, value):
         if value is None:
-            raise LibtabNativeError("internal error: attempted to pass a null out-parameter pointer to a libtab C function that writes through it — refusing rather than risking a segfault")  # pragma: no mutate
+            raise TabulaError("internal error: attempted to pass a null out-parameter pointer to a libtab C function that writes through it — refusing rather than risking a segfault")  # pragma: no mutate
         # pragma: no mutate — dispatch point; see _NonNullHandle.from_param.
         return cls._base.from_param(value)  # pragma: no mutate
 
@@ -120,10 +120,10 @@ def _address_is_plausible(ptr) -> bool:
 
 def _string_at(ptr, size: int = -1) -> bytes:
     """ctypes.string_at with the address validated first. Raises
-    LibtabNativeError instead of letting an implausible address reach
+    TabulaError instead of letting an implausible address reach
     the raw memory read (which would segfault, not raise)."""
     if not _address_is_plausible(ptr):
-        raise LibtabNativeError(f"internal error: implausible memory address {ptr!r} passed where a C-heap pointer was expected — refusing rather than risking a segfault")  # pragma: no mutate
+        raise TabulaError(f"internal error: implausible memory address {ptr!r} passed where a C-heap pointer was expected — refusing rather than risking a segfault")  # pragma: no mutate
     if size >= 0:
         # pragma: no mutate on the raw reads below — these ARE the guarded
         # memory access; a mutant here (e.g. string_at(size), string_at(None))
@@ -141,7 +141,7 @@ def _find_so() -> str:
     override = os.environ.get("LIBTAB_SO")
     if override:
         if not os.path.exists(override):
-            raise NativeUnavailable(f"LIBTAB_SO={override} does not exist")  # pragma: no mutate
+            raise TabulaUnavailable(f"LIBTAB_SO={override} does not exist")  # pragma: no mutate
         return override
 
     pkg_dir = os.path.dirname(os.path.abspath(__file__))
@@ -157,7 +157,7 @@ def _find_so() -> str:
     ):
         if os.path.exists(candidate):
             return candidate
-    raise NativeUnavailable(f"libtab.so not found (looked in {pkg_dir} and {repo_root}/vendor) — install a wheel, or run vendor/build.sh in a source checkout (needs a C toolchain)")  # pragma: no mutate
+    raise TabulaUnavailable(f"libtab.so not found (looked in {pkg_dir} and {repo_root}/vendor) — install a wheel, or run vendor/build.sh in a source checkout (needs a C toolchain)")  # pragma: no mutate
 
 
 class _TabColSpec(ctypes.Structure):
@@ -299,7 +299,7 @@ def _check_error(lib: ctypes.CDLL, context: str) -> None:
     err = lib.tab_lasterror()
     msg = err.decode() if err else _UNKNOWN_ERROR
     if msg != "no error":
-        raise LibtabNativeError(f"{context}: {msg}")
+        raise TabulaError(f"{context}: {msg}")
 
 
 def _open_hint(msg: str) -> str:
@@ -341,24 +341,24 @@ def _require_bytes(value: object, name: str) -> bytes:
 
 
 @dataclass
-class NativeColumn:
+class Column:
     name: str
     type: str | None = None
     algo: str | None = None
     signer: str | None = None
 
 
-class NativeRow:
-    """Opaque row handle. Read cells via NativeTable.get(row, col).
+class Row:
+    """Opaque row handle. Read cells via Tabula.get(row, col).
 
     tab_remove_row() frees the underlying C TabRow struct on success
     (see tab_rowmap_delete in tab_rowmap.c) — the pointer becomes
     dangling. libtab.c's own guard only catches nil/t->nilrow, not an
-    already-freed-and-reused row, so passing a stale NativeRow back
+    already-freed-and-reused row, so passing a stale Row back
     into any tab_* call after removal is a use-after-free at the C
     level (confirmed: it segfaults, not raises). _freed tracks this on
     the Python side so every wrapper method can raise a clean
-    LibtabNativeError instead of ever handing a stale pointer to C.
+    TabulaError instead of ever handing a stale pointer to C.
     """
 
     def __init__(self, ptr: int):
@@ -374,10 +374,10 @@ class NativeRow:
         be falsy. A truthiness check here would let a corrupted _freed
         silently permit a use-after-free dereference instead of raising."""
         if self._freed is not False:
-            raise LibtabNativeError("this row was already removed (tab_remove_row frees the underlying C struct) — the handle is no longer valid")  # pragma: no mutate
+            raise TabulaError("this row was already removed (tab_remove_row frees the underlying C struct) — the handle is no longer valid")  # pragma: no mutate
 
 
-class NativeTable:
+class Tabula:
     """ctypes-backed Table, wrapping the real libtab.c Tab handle."""
 
     def __init__(self, handle: int):
@@ -388,7 +388,7 @@ class NativeTable:
     def _check_open(self) -> None:
         """tab_close() frees the underlying C Tab struct. Confirmed via
         mutation testing + manual reproduction: calling a method on a
-        closed NativeTable does not reliably raise or crash — it can
+        closed Tabula does not reliably raise or crash — it can
         silently return garbage data read from freed/reused memory
         (observed: colname(0) returning an unrelated character after
         close()). Every method touching self._handle must check this
@@ -402,10 +402,10 @@ class NativeTable:
         value (e.g. from an internal bug) segfault-proof instead of a
         silent use-after-free."""
         if self._closed is not False:
-            raise LibtabNativeError("this table is closed (tab_close frees the underlying C struct) — the handle is no longer valid")  # pragma: no mutate
+            raise TabulaError("this table is closed (tab_close frees the underlying C struct) — the handle is no longer valid")  # pragma: no mutate
 
     @classmethod
-    def create(cls, path: str, schema_name: str, columns: list[NativeColumn]) -> NativeTable:
+    def create(cls, path: str, schema_name: str, columns: list[Column]) -> Tabula:
         lib = _get_lib()
         specs = (_TabColSpec * len(columns))(*[
             _TabColSpec(
@@ -419,53 +419,53 @@ class NativeTable:
         handle = lib.tab_create(path.encode(), schema_name.encode(), specs, len(columns))
         if not handle:
             _check_error(lib, "tab_create")
-            raise LibtabNativeError("tab_create failed with no error message")  # pragma: no mutate
+            raise TabulaError("tab_create failed with no error message")  # pragma: no mutate
         return cls(handle)
 
     @classmethod
-    def open(cls, path: str) -> NativeTable:
+    def open(cls, path: str) -> Tabula:
         lib = _get_lib()
         handle = lib.tab_open(path.encode())
         if not handle:
             try:
                 _check_error(lib, "tab_open")
-            except LibtabNativeError as e:
+            except TabulaError as e:
                 hint = _open_hint(str(e))
                 if hint:
-                    raise LibtabNativeError(f"{e}{hint}") from e
+                    raise TabulaError(f"{e}{hint}") from e
                 raise
-            raise LibtabNativeError("tab_open failed with no error message")  # pragma: no mutate
+            raise TabulaError("tab_open failed with no error message")  # pragma: no mutate
         return cls(handle)
 
-    def add_row(self, head_attr: str, head_val: str) -> NativeRow:
+    def add_row(self, head_attr: str, head_val: str) -> Row:
         self._check_open()
         r = self._lib.tab_add_row(self._handle, head_attr.encode(), head_val.encode())
         if not r:
             _check_error(self._lib, "tab_add_row")
-            raise LibtabNativeError("tab_add_row failed with no error message")  # pragma: no mutate
-        return NativeRow(r)
+            raise TabulaError("tab_add_row failed with no error message")  # pragma: no mutate
+        return Row(r)
 
-    def set(self, row: NativeRow, col: str, value: str) -> None:
+    def set(self, row: Row, col: str, value: str) -> None:
         self._check_open()
         row._check_live()
         rc = self._lib.tab_set(self._handle, row._ptr, col.encode(), value.encode())
         if rc:  # 0 = success, -1 = error (libtab.h contract)
             _check_error(self._lib, "tab_set")
 
-    def get(self, row: NativeRow, col: str) -> str | None:
+    def get(self, row: Row, col: str) -> str | None:
         self._check_open()
         row._check_live()
         v = self._lib.tab_get(row._ptr, col.encode())
         return v.decode() if v is not None else None
 
-    def clear(self, row: NativeRow, col: str) -> None:
+    def clear(self, row: Row, col: str) -> None:
         self._check_open()
         row._check_live()
         rc = self._lib.tab_clear(self._handle, row._ptr, col.encode())
         if rc:  # 0 = success, -1 = error
             _check_error(self._lib, "tab_clear")
 
-    def remove_row(self, row: NativeRow) -> None:
+    def remove_row(self, row: Row) -> None:
         self._check_open()
         row._check_live()
         rc = self._lib.tab_remove_row(self._handle, row._ptr)
@@ -479,13 +479,13 @@ class NativeTable:
         # and a later call on this row would use-after-free. This must
         # hold in every build, optimized or not.
         if row._freed is not True:  # pragma: no cover - defensive invariant
-            raise LibtabNativeError("internal invariant violated: row not marked freed after remove")  # pragma: no mutate
+            raise TabulaError("internal invariant violated: row not marked freed after remove")  # pragma: no mutate
 
     def commit(self) -> None:
         """Persist the in-memory table to its path.
 
         Does NOT create missing parent directories — the path's
-        directory must already exist, or this raises LibtabNativeError.
+        directory must already exist, or this raises TabulaError.
         """
         self._check_open()
         rc = self._lib.tab_commit(self._handle)
@@ -504,9 +504,9 @@ class NativeTable:
             # `self._closed = False`, _check_open can't distinguish it
             # from "never closed" and the next call use-after-frees.
             if self._closed is not True:  # pragma: no cover - defensive invariant
-                raise LibtabNativeError("internal invariant violated: table not marked closed")  # pragma: no mutate
+                raise TabulaError("internal invariant violated: table not marked closed")  # pragma: no mutate
 
-    def __enter__(self) -> NativeTable:
+    def __enter__(self) -> Tabula:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -538,34 +538,34 @@ class NativeTable:
         v = self._lib.tab_col_attr(self._handle, col.encode(), key.encode())
         return v.decode() if v else None
 
-    def _drain_iter(self, it: int, context: str) -> list[NativeRow]:
+    def _drain_iter(self, it: int, context: str) -> list[Row]:
         """Walk a TabIter to exhaustion into a list, always closing it.
         Shared by iter_rows() and search(), which differ only in how the
         iterator is opened."""
         if not it:
             _check_error(self._lib, context)
-            raise LibtabNativeError(f"{context} failed with no error message")  # pragma: no mutate
+            raise TabulaError(f"{context} failed with no error message")  # pragma: no mutate
         rows = []
         try:
             while True:
                 r = self._lib.tab_iter_next(it)
                 if not r:
                     break
-                rows.append(NativeRow(r))
+                rows.append(Row(r))
         finally:
             self._lib.tab_iter_close(it)
         return rows
 
-    def iter_rows(self) -> list[NativeRow]:
+    def iter_rows(self) -> list[Row]:
         self._check_open()
         return self._drain_iter(self._lib.tab_iter(self._handle), "tab_iter")
 
-    def search(self, col: str, value: str) -> list[NativeRow]:
+    def search(self, col: str, value: str) -> list[Row]:
         self._check_open()
         it = self._lib.tab_search(self._handle, col.encode(), value.encode())
         return self._drain_iter(it, "tab_search")
 
-    def set_hashed(self, row: NativeRow, col: str, preimage: bytes) -> None:
+    def set_hashed(self, row: Row, col: str, preimage: bytes) -> None:
         self._check_open()
         row._check_live()
         preimage = _require_bytes(preimage, "preimage")
@@ -573,7 +573,7 @@ class NativeTable:
         if rc:  # 0 = success, -1 = error
             _check_error(self._lib, "tab_set_hashed")
 
-    def set_hashed_argon2id(self, row: NativeRow, col: str, preimage: bytes) -> None:
+    def set_hashed_argon2id(self, row: Row, col: str, preimage: bytes) -> None:
         self._check_open()
         row._check_live()
         preimage = _require_bytes(preimage, "preimage")
@@ -583,7 +583,7 @@ class NativeTable:
         if rc:  # 0 = success, -1 = error
             _check_error(self._lib, "tab_set_hashed_argon2id")
 
-    def verify_hash(self, row: NativeRow, col: str, preimage: bytes) -> bool:
+    def verify_hash(self, row: Row, col: str, preimage: bytes) -> bool:
         row._check_live()
         preimage = _require_bytes(preimage, "preimage")
         rc = self._lib.tab_verify_hash(row._ptr, col.encode(), preimage, len(preimage))
@@ -591,32 +591,32 @@ class NativeTable:
             _check_error(self._lib, "tab_verify_hash")
         return rc == 1
 
-    def set_signed(self, row: NativeRow, col: str, body: bytes, signer_sk: bytes) -> None:
+    def set_signed(self, row: Row, col: str, body: bytes, signer_sk: bytes) -> None:
         self._check_open()
         row._check_live()
         body = _require_bytes(body, "body")
         signer_sk = _require_bytes(signer_sk, "signer_sk")
         if len(signer_sk) != 64:
-            raise LibtabNativeError("signer_sk must be 64 bytes (monocypher seed+pubkey form)")  # pragma: no mutate
+            raise TabulaError("signer_sk must be 64 bytes (monocypher seed+pubkey form)")  # pragma: no mutate
         sk_buf = ctypes.c_char.__mul__(64)(*[bytes([b]) for b in signer_sk])
         rc = self._lib.tab_set_signed(self._handle, row._ptr, col.encode(), body, len(body), sk_buf)
         if rc:  # 0 = success, -1 = error
             _check_error(self._lib, "tab_set_signed")
 
-    def verify_signed(self, row: NativeRow, col: str, signer_pk: bytes) -> bytes:
+    def verify_signed(self, row: Row, col: str, signer_pk: bytes) -> bytes:
         row._check_live()
         signer_pk = _require_bytes(signer_pk, "signer_pk")
         if len(signer_pk) != 32:
-            raise LibtabNativeError("signer_pk must be 32 bytes")  # pragma: no mutate
+            raise TabulaError("signer_pk must be 32 bytes")  # pragma: no mutate
         pk_buf = ctypes.c_char.__mul__(32)(*[bytes([b]) for b in signer_pk])
         outlen = ctypes.c_int(0)  # pragma: no mutate — C overwrites outlen; initial value is dead
         ptr = self._lib.tab_verify_signed(row._ptr, col.encode(), pk_buf, ctypes.byref(outlen))
         if not ptr:
             _check_error(self._lib, "tab_verify_signed")
-            raise LibtabNativeError("tab_verify_signed failed with no error message")  # pragma: no mutate
+            raise TabulaError("tab_verify_signed failed with no error message")  # pragma: no mutate
         return _string_at(ptr, outlen.value)
 
-    def set_sealed(self, row: NativeRow, col: str, plaintext: bytes, key: bytes) -> None:
+    def set_sealed(self, row: Row, col: str, plaintext: bytes, key: bytes) -> None:
         """Encrypt `plaintext` under `key` and store it as a self-
         describing `sealed:<base64url>` cell in an ORDINARY (untyped)
         column. Unlike HASHED/SIGNED, sealing is a py-libtab convention
@@ -629,14 +629,14 @@ class NativeTable:
         blob = seal(key, plaintext)  # validates key/plaintext are bytes
         self.set(row, col, "sealed:" + b64_encode(blob))
 
-    def get_sealed(self, row: NativeRow, col: str, key: bytes) -> bytes:
+    def get_sealed(self, row: Row, col: str, key: bytes) -> bytes:
         """Read a cell written by set_sealed() and decrypt it under
-        `key`. Raises LibtabNativeError if the cell isn't a sealed blob,
+        `key`. Raises TabulaError if the cell isn't a sealed blob,
         or if the key is wrong / the blob was tampered with."""
         self._check_open()
         cell = self.get(row, col)
         if cell is None or not cell.startswith("sealed:"):
-            raise LibtabNativeError(f"cell {col!r} is not a sealed value")  # pragma: no mutate
+            raise TabulaError(f"cell {col!r} is not a sealed value")  # pragma: no mutate
         blob = b64_decode(cell[len("sealed:"):])
         return unseal(key, blob)  # validates key, raises on wrong key/tamper
 
@@ -647,7 +647,7 @@ def b64_encode(data: bytes) -> str:
     ptr = lib.tab_b64_encode(data, len(data))
     if not ptr:
         _check_error(lib, "tab_b64_encode")
-        raise LibtabNativeError("tab_b64_encode failed with no error message")  # pragma: no mutate
+        raise TabulaError("tab_b64_encode failed with no error message")  # pragma: no mutate
     return _string_at(ptr).decode()
 
 
@@ -657,7 +657,7 @@ def b64_decode(s: str) -> bytes:
     ptr = lib.tab_b64_decode(s.encode(), ctypes.byref(outlen))
     if not ptr:
         _check_error(lib, "tab_b64_decode")
-        raise LibtabNativeError("tab_b64_decode failed with no error message")  # pragma: no mutate
+        raise TabulaError("tab_b64_decode failed with no error message")  # pragma: no mutate
     return _string_at(ptr, outlen.value)
 
 
@@ -694,7 +694,7 @@ def _keypair_from_seed(seed: bytes) -> tuple[bytes, bytes]:
     """Derive an Ed25519 keypair from an exact 32-byte `seed`.
 
     Returns ``(secret_key[64], public_key[32])`` — the tuple that
-    ``NativeTable.set_signed`` (secret key) and ``verify_signed`` (public
+    ``Tabula.set_signed`` (secret key) and ``verify_signed`` (public
     key) consume directly.
 
     SECURITY: the seed *is* the private key material. Its secrecy and
@@ -706,7 +706,7 @@ def _keypair_from_seed(seed: bytes) -> tuple[bytes, bytes]:
     """
     seed = _require_bytes(seed, "seed")
     if len(seed) != SIGN_SEED_LEN:
-        raise LibtabNativeError("seed must be 32 bytes")  # pragma: no mutate
+        raise TabulaError("seed must be 32 bytes")  # pragma: no mutate
     lib = _get_lib()
 
     sk_buf = (ctypes.c_char * SIGN_SECRET_KEY_LEN)()
@@ -722,9 +722,9 @@ def keypair() -> tuple[bytes, bytes]:
     Returns ``(secret_key, public_key)``:
 
     - ``secret_key`` (64 bytes) — keep it secret; pass it to
-      ``NativeTable.set_signed`` to sign a cell.
+      ``Tabula.set_signed`` to sign a cell.
     - ``public_key`` (32 bytes) — share it freely; pass it to
-      ``NativeTable.verify_signed`` to check a signature.
+      ``Tabula.verify_signed`` to check a signature.
 
     The seed is drawn from ``secrets.token_bytes`` (the OS CSPRNG), so
     each call yields an independent, unpredictable key — you never handle
@@ -741,7 +741,7 @@ def seal(key: bytes, plaintext: bytes) -> bytes:
     key = _require_bytes(key, "key")
     plaintext = _require_bytes(plaintext, "plaintext")
     if len(key) != SEAL_KEY_LEN:
-        raise LibtabNativeError("key must be 32 bytes")  # pragma: no mutate
+        raise TabulaError("key must be 32 bytes")  # pragma: no mutate
     lib = _get_lib()
 
     nonce = os.urandom(SEAL_NONCE_LEN)
@@ -760,15 +760,15 @@ def seal(key: bytes, plaintext: bytes) -> bytes:
 
 def unseal(key: bytes, blob: bytes) -> bytes:
     """Decrypt a blob produced by seal() under the same 32-byte `key`.
-    Returns the plaintext, or raises LibtabNativeError if the key is
+    Returns the plaintext, or raises TabulaError if the key is
     wrong or the blob was tampered with (Poly1305 authentication fails)
     — the two are indistinguishable, by design."""
     key = _require_bytes(key, "key")
     blob = _require_bytes(blob, "blob")
     if len(key) != SEAL_KEY_LEN:
-        raise LibtabNativeError("key must be 32 bytes")  # pragma: no mutate
+        raise TabulaError("key must be 32 bytes")  # pragma: no mutate
     if len(blob) < _SEAL_HEADER_LEN:
-        raise LibtabNativeError("sealed blob too short")  # pragma: no mutate
+        raise TabulaError("sealed blob too short")  # pragma: no mutate
     lib = _get_lib()
 
     nonce = blob[:SEAL_NONCE_LEN]
@@ -783,5 +783,5 @@ def unseal(key: bytes, blob: bytes) -> bytes:
     # ad=None, ad_size=0; see seal() — same pragma rationale.
     rc = lib.crypto_aead_unlock(pt_buf, mac_buf, key_buf, nonce_buf, None, 0, ciphertext, len(ciphertext))  # pragma: no mutate
     if rc != 0:
-        raise LibtabNativeError("unseal failed: wrong key or tampered blob")  # pragma: no mutate
+        raise TabulaError("unseal failed: wrong key or tampered blob")  # pragma: no mutate
     return bytes(pt_buf)[: len(ciphertext)]

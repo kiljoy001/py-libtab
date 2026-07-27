@@ -49,8 +49,8 @@ def test_b64_encode_rejects_non_bytes():
 
 def test_set_hashed_rejects_non_bytes_preimage(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("pwhash", type="HASHED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("pwhash", type="HASHED"),
     ])
     r = t.add_row("id", "a")
     with pytest.raises(TypeError, match="preimage must be bytes"):
@@ -61,9 +61,9 @@ def test_set_hashed_rejects_non_bytes_preimage(tmp_path):
 def test_set_hashed_argon2id_rejects_non_bytes_preimage(tmp_path):
     pytest.importorskip("argon2")
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"),
-        native.NativeColumn("pwhash", type="HASHED", algo="argon2id"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"),
+        native.Column("pwhash", type="HASHED", algo="argon2id"),
     ])
     r = t.add_row("id", "a")
     with pytest.raises(TypeError, match="preimage must be bytes"):
@@ -73,8 +73,8 @@ def test_set_hashed_argon2id_rejects_non_bytes_preimage(tmp_path):
 
 def test_verify_hash_rejects_non_bytes_preimage(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("pwhash", type="HASHED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("pwhash", type="HASHED"),
     ])
     r = t.add_row("id", "a")
     t.set_hashed(r, "pwhash", b"secret123")
@@ -87,8 +87,8 @@ def test_set_signed_rejects_non_bytes_body(tmp_path):
     from tests.conftest import monocypher_keypair as _monocypher_keypair
 
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
     sk, _pk = _monocypher_keypair(bytes(range(32)))
@@ -99,8 +99,8 @@ def test_set_signed_rejects_non_bytes_body(tmp_path):
 
 def test_set_signed_rejects_non_bytes_signer_sk(tmp_path):
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
     with pytest.raises(TypeError, match="signer_sk must be bytes"):
@@ -112,8 +112,8 @@ def test_verify_signed_rejects_non_bytes_signer_pk(tmp_path):
     from tests.conftest import monocypher_keypair as _monocypher_keypair
 
     path = str(tmp_path / "t.tab")
-    t = native.NativeTable.create(path, "t", [
-        native.NativeColumn("id"), native.NativeColumn("body", type="SIGNED"),
+    t = native.Tabula.create(path, "t", [
+        native.Column("id"), native.Column("body", type="SIGNED"),
     ])
     r = t.add_row("id", "a")
     sk, _pk = _monocypher_keypair(bytes(range(32)))

@@ -3,7 +3,7 @@
 These wrap monocypher's crypto_eddsa_key_pair so callers never touch
 ctypes. The security-critical properties: correct key sizes, fresh
 randomness per call, seed-length validation, and that the generated keys
-actually sign and verify through NativeTable.
+actually sign and verify through Tabula.
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def test_keypair_from_seed_rejects_off_by_one_lengths(length):
     # ...and anything else — including 31 and 33 — is rejected. This pins
     # the guard to the exact constant (a mutant that widens it to some
     # unrelated value would let 31/33 through and fail here).
-    with pytest.raises(native.LibtabNativeError, match="32 bytes"):
+    with pytest.raises(native.TabulaError, match="32 bytes"):
         native._keypair_from_seed(b"\x00" * length)
 
 
@@ -75,17 +75,17 @@ def test_keypair_secret_key_embeds_public_key():
 def test_keypair_signs_and_verifies(tmp_path):
     sk, pk = native.keypair()
     path = str(tmp_path / "signed.tab")
-    t = native.NativeTable.create(
+    t = native.Tabula.create(
         path, "v",
-        [native.NativeColumn("id"),
-         native.NativeColumn("amt", type="SIGNED", signer="cfo")],
+        [native.Column("id"),
+         native.Column("amt", type="SIGNED", signer="cfo")],
     )
     r = t.add_row("id", "1")
     t.set_signed(r, "amt", b"1000", sk)
     t.commit()
     t.close()
 
-    t2 = native.NativeTable.open(path)
+    t2 = native.Tabula.open(path)
     r2 = t2.search("id", "1")[0]
     assert t2.verify_signed(r2, "amt", pk) == b"1000"
     t2.close()
@@ -95,18 +95,18 @@ def test_keypair_wrong_public_key_fails_verification(tmp_path):
     sk, _pk = native.keypair()
     _sk2, pk2 = native.keypair()  # unrelated key
     path = str(tmp_path / "signed.tab")
-    t = native.NativeTable.create(
+    t = native.Tabula.create(
         path, "v",
-        [native.NativeColumn("id"),
-         native.NativeColumn("amt", type="SIGNED", signer="cfo")],
+        [native.Column("id"),
+         native.Column("amt", type="SIGNED", signer="cfo")],
     )
     r = t.add_row("id", "1")
     t.set_signed(r, "amt", b"1000", sk)
     t.commit()
     t.close()
 
-    t2 = native.NativeTable.open(path)
+    t2 = native.Tabula.open(path)
     r2 = t2.search("id", "1")[0]
-    with pytest.raises(native.LibtabNativeError):
+    with pytest.raises(native.TabulaError):
         t2.verify_signed(r2, "amt", pk2)
     t2.close()

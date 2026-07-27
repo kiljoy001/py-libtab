@@ -23,13 +23,13 @@ def _one(data: bytes) -> None:
     s = data.decode("latin-1")
     try:
         native.b64_decode(s)
-    except (native.LibtabNativeError, ValueError, UnicodeError):
+    except (native.TabulaError, ValueError, UnicodeError):
         pass  # expected on malformed base64
     # round-trip a real encode too (exercises tab_b64_encode's C buffer math)
     try:
         enc = native.b64_encode(data)
         native.b64_decode(enc)
-    except native.LibtabNativeError:
+    except native.TabulaError:
         pass
 
 
