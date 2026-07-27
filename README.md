@@ -76,7 +76,7 @@ credentials you'd typically seal the table or keep it out of version control.)
 
      your Python code  —  writing a tamper-evident audit log
      ┌──────────────────────────────────────────────────────────────┐
-     │ t = NativeTable.create("audit.tab", ...)                      │
+     │ t = Tabula.create("audit.tab", ...)                           │
      │ t.set(row, "event", "user.delete")   → plain text             │
      │ t.set_hashed(row, "payload", blob)   → BLAKE2b content hash    │
      │ t.set_signed(row, "sig", entry, sk)  → Ed25519 signature      │
@@ -109,7 +109,7 @@ credentials you'd typically seal the table or keep it out of version control.)
                      │ reads
                      ▼
      ┌──────────────────────────────────────────────────────────────┐
-     │ t = NativeTable.open("audit.tab")                             │
+     │ t = Tabula.open("audit.tab")                                  │
      │ row = t.search("event", "user.delete")[0]                     │
      │                                                               │
      │ t.verify_hash(row, "payload", blob)  → True / False  (did the │
@@ -129,13 +129,13 @@ hash** of its payload (integrity), and an **Ed25519 signature** over the entry
 (provenance):
 
 ```python
-from libtab import NativeTable, NativeColumn
+from libtab import Tabula, Column
 
-t = NativeTable.create("audit.tab", "audit", [
-    NativeColumn("id"),
-    NativeColumn("event"),
-    NativeColumn("payload", type="HASHED"),
-    NativeColumn("sig", type="SIGNED", signer="ci"),
+t = Tabula.create("audit.tab", "audit", [
+    Column("id"),
+    Column("event"),
+    Column("payload", type="HASHED"),
+    Column("sig", type="SIGNED", signer="ci"),
 ])
 row = t.add_row("id", "2024-06-01T12:00Z-0001")
 t.set(row, "event", "user.delete")
@@ -166,9 +166,9 @@ signature proves the entry is authentic (and returns the signed bytes, or
 raises if it was forged):
 
 ```python
-from libtab import NativeTable
+from libtab import Tabula
 
-t = NativeTable.open("audit.tab")
+t = Tabula.open("audit.tab")
 row = t.search("event", "user.delete")[0]
 
 t.verify_hash(row, "payload", payload_blob)    # True if the payload matches
@@ -185,13 +185,13 @@ the sealed value is ciphertext on disk:
 
 ```python
 import os
-from libtab import NativeTable, NativeColumn
+from libtab import Tabula, Column
 
 key = os.urandom(32)   # keep this out of the file
 
-t = NativeTable.create("vault.tab", "vault", [
-    NativeColumn("id"),
-    NativeColumn("secret"),        # an ordinary column; sealing is per-value
+t = Tabula.create("vault.tab", "vault", [
+    Column("id"),
+    Column("secret"),        # an ordinary column; sealing is per-value
 ])
 row = t.add_row("id", "stripe-api-key")
 t.set_sealed(row, "secret", b"sk-live-abc123", key)
@@ -199,12 +199,17 @@ t.commit()
 t.close()
 # on disk:  secret=sealed:LZ5tJO8m...   (plaintext never present)
 
-t = NativeTable.open("vault.tab")
+t = Tabula.open("vault.tab")
 row = t.search("id", "stripe-api-key")[0]
 t.get_sealed(row, "secret", key)              # b"sk-live-abc123"
 t.get_sealed(row, "secret", os.urandom(32))   # raises — wrong key or tampered
 t.close()
 ```
+
+Sealing (XChaCha20-Poly1305) is length-preserving, like any AEAD: the
+ciphertext hides the value but not its size, so the length of a sealed
+secret is inferable from the file. If that matters for your threat model,
+pad the plaintext to a fixed size before sealing.
 
 Sealing uses XChaCha20-Poly1305 with a fresh random nonce per value, so it's
 also tamper-evident: a modified ciphertext fails to decrypt. The raw
