@@ -11,6 +11,7 @@ These tests exist to give mutation testing something to actually kill.
 from __future__ import annotations
 
 import os
+import warnings
 
 import pytest
 
@@ -99,7 +100,9 @@ def test_leading_hash_value_is_dropped_as_comment(tmp_path):
     path = tmp_path / "hash.tab"
     t = native.Tabula.create(str(path), "t", [native.Column("id"), native.Column("v")])
     r = t.add_row("id", "x")
-    t.set(r, "v", "#abc")
+    # set() warns about the silent-loss trap but still writes verbatim.
+    with pytest.warns(UserWarning, match="ndb grammar treats as a comment"):
+        t.set(r, "v", "#abc")
     t.commit()
     t.close()
     t2 = native.Tabula.open(str(path))
@@ -108,12 +111,51 @@ def test_leading_hash_value_is_dropped_as_comment(tmp_path):
     t2.close()
     # '#' mid-value is fine — only a leading '#' is reserved.
     t3 = native.Tabula.create(str(tmp_path / "mid.tab"), "t", [native.Column("v")])
-    rr = t3.add_row("v", "a#b")
+    t3.add_row("v", "a#b")
     t3.commit()
     t3.close()
     t4 = native.Tabula.open(str(tmp_path / "mid.tab"))
     assert t4.get(t4.iter_rows()[0], "v") == "a#b"
     t4.close()
+
+
+def test_leading_hash_warns_on_set_and_add_row(tmp_path):
+    # The sugar: because a leading '#' is lost silently, warn at WRITE time
+    # (set and add_row's head value) so the caller finds out immediately.
+    path = str(tmp_path / "w.tab")
+    t = native.Tabula.create(path, "t", [native.Column("id"), native.Column("v")])
+    with pytest.warns(UserWarning, match=r"starts with '#'"):
+        r = t.add_row("id", "#head")
+    with pytest.warns(UserWarning, match=r"Double-quote it"):
+        t.set(r, "v", "#val")
+    t.close()
+
+
+def test_no_hash_warning_for_safe_values(tmp_path, recwarn):
+    # Values that don't start with '#' (including '#' mid-value) must not warn.
+    path = str(tmp_path / "s.tab")
+    t = native.Tabula.create(path, "t", [native.Column("id"), native.Column("v")])
+    r = t.add_row("id", "row")
+    t.set(r, "v", "a#b")
+    t.set(r, "v", "plain")
+    t.close()
+    assert not [w for w in recwarn.list if issubclass(w.category, UserWarning)]
+
+
+def test_leading_hash_quoted_survives(tmp_path):
+    # And the documented fix works: quoting a leading-'#' value keeps it
+    # (no warning either, since the written value starts with a quote).
+    path = str(tmp_path / "q.tab")
+    t = native.Tabula.create(path, "t", [native.Column("id"), native.Column("v")])
+    r = t.add_row("id", "x")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # any warning would fail here
+        t.set(r, "v", '"#abc"')
+    t.commit()
+    t.close()
+    t2 = native.Tabula.open(path)
+    assert t2.get(t2.search("id", "x")[0], "v") == "#abc"
+    t2.close()
 
 
 def test_commit_to_missing_parent_dir_raises(tmp_path):

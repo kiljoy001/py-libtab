@@ -21,6 +21,7 @@ from __future__ import annotations
 import ctypes
 import os
 import secrets
+import warnings
 from dataclasses import dataclass
 
 
@@ -324,6 +325,27 @@ def _open_hint(msg: str) -> str:
     return ""  # pragma: no mutate
 
 
+def _warn_leading_hash(value: str, where: str) -> None:
+    """Warn when a value starts with '#'.
+
+    In the ndb grammar a leading '#' marks a comment, so a value like
+    ``#abc`` is silently dropped on read (it comes back empty) — unlike
+    the unquoted-space case, which fails loudly at open(). Because the
+    loss is silent, we warn at write time so the caller finds out when
+    they do it, not weeks later when the value is mysteriously blank. We
+    only *warn* — libtab writes exactly what the caller asked (it trusts
+    the caller with representation); double-quote the value to keep it.
+    """
+    if value.startswith("#"):  # pragma: no mutate
+        warnings.warn(  # pragma: no mutate
+            f"{where}: value {value!r} starts with '#', which the ndb "
+            "grammar treats as a comment — it will read back empty. "
+            'Double-quote it to keep it, e.g. \'"#abc"\'.',
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def _require_bytes(value: object, name: str) -> bytes:
     """Validate a buffer before it crosses into a (pointer, length) C
     call. libtab.c trusts its caller completely — it does no bounds or
@@ -439,6 +461,7 @@ class Tabula:
 
     def add_row(self, head_attr: str, head_val: str) -> Row:
         self._check_open()
+        _warn_leading_hash(head_val, "add_row")
         r = self._lib.tab_add_row(self._handle, head_attr.encode(), head_val.encode())
         if not r:
             _check_error(self._lib, "tab_add_row")
@@ -448,6 +471,7 @@ class Tabula:
     def set(self, row: Row, col: str, value: str) -> None:
         self._check_open()
         row._check_live()
+        _warn_leading_hash(value, "set")
         rc = self._lib.tab_set(self._handle, row._ptr, col.encode(), value.encode())
         if rc:  # 0 = success, -1 = error (libtab.h contract)
             _check_error(self._lib, "tab_set")
