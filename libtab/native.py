@@ -293,6 +293,28 @@ def _check_error(lib: ctypes.CDLL, context: str) -> None:
         raise LibtabNativeError(f"{context}: {msg}")
 
 
+def _open_hint(msg: str) -> str:
+    """Return a friendlier explanation to append to a tab_open failure, or
+    an empty string if the failure is not a recognised pattern.
+
+    libtab values follow the ndb grammar: whitespace separates
+    attribute/value pairs, so a value containing an unquoted space (e.g.
+    ``payee=Widget LLC``) is parsed as *two* tuples, and the second word
+    surfaces as an "undeclared column". That raw message is baffling to
+    someone who never wrote a column by that name, so we recognise the
+    pattern and point at the real cause. It is a *hint*, not a certain
+    diagnosis (a genuinely malformed file can also trip this), so the
+    wording hedges accordingly.
+    """
+    if "undeclared column" in msg:  # pragma: no mutate
+        return (  # pragma: no mutate
+            " — this usually means a value in the file contains an unquoted "
+            "space. libtab values follow the ndb grammar, so a value with a "
+            'space must be double-quoted, e.g. payee="Widget LLC".'
+        )
+    return ""  # pragma: no mutate
+
+
 def _require_bytes(value: object, name: str) -> bytes:
     """Validate a buffer before it crosses into a (pointer, length) C
     call. libtab.c trusts its caller completely — it does no bounds or
@@ -396,7 +418,13 @@ class NativeTable:
         lib = _get_lib()
         handle = lib.tab_open(path.encode())
         if not handle:
-            _check_error(lib, "tab_open")
+            try:
+                _check_error(lib, "tab_open")
+            except LibtabNativeError as e:
+                hint = _open_hint(str(e))
+                if hint:
+                    raise LibtabNativeError(f"{e}{hint}") from e
+                raise
             raise LibtabNativeError("tab_open failed with no error message")  # pragma: no mutate
         return cls(handle)
 

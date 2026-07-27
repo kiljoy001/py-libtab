@@ -42,6 +42,54 @@ def test_open_malformed_file_raises(tmp_path):
         native.NativeTable.open(str(path))
 
 
+def test_open_hint_recognises_undeclared_column():
+    # The raw C message for an unquoted-space value is baffling; _open_hint
+    # turns it into an actionable explanation. Pure function — pin it directly.
+    hint = native._open_hint("tab_open: row 0 has undeclared column %q%")
+    assert "unquoted" in hint
+    assert 'payee="Widget LLC"' in hint
+
+
+def test_open_hint_silent_for_unrelated_errors():
+    # A hint must not be appended to failures it can't explain.
+    assert native._open_hint("tab_open: cannot open file: no such file") == ""
+
+
+def test_open_unquoted_space_value_gives_hint(tmp_path):
+    # A value with a space parses as two ndb tuples; the second word looks
+    # like an undeclared column. open() should surface the space-quoting hint.
+    path = tmp_path / "spacey.tab"
+    t = native.NativeTable.create(
+        str(path), "payments",
+        [native.NativeColumn("payee"), native.NativeColumn("amount")],
+    )
+    r = t.add_row("payee", "Widget")
+    t.set(r, "amount", "1000")
+    t.commit()
+    t.close()
+    # Inject the footgun: an unquoted space in the head value on disk.
+    text = path.read_text().replace("payee=Widget", "payee=Widget LLC")
+    path.write_text(text)
+    with pytest.raises(native.LibtabNativeError) as excinfo:
+        native.NativeTable.open(str(path))
+    assert "unquoted" in str(excinfo.value)
+
+
+def test_open_quoted_space_value_round_trips(tmp_path):
+    # The correct form: a double-quoted value with a space opens cleanly and
+    # the quotes are stripped on read.
+    path = tmp_path / "quoted.tab"
+    t = native.NativeTable.create(
+        str(path), "payments", [native.NativeColumn("payee")],
+    )
+    t.add_row("payee", '"Widget LLC"')
+    t.commit()
+    t.close()
+    t2 = native.NativeTable.open(str(path))
+    assert t2.get(t2.iter_rows()[0], "payee") == "Widget LLC"
+    t2.close()
+
+
 def test_commit_to_missing_parent_dir_raises(tmp_path):
     # create() only builds the in-memory Tab; the filesystem write
     # happens at commit(). libtab.c's local-write path (tab_persist.c)
