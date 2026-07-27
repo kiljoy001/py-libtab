@@ -6,7 +6,7 @@ graft vendor/plan9port/src
 graft vendor/libtab_c
 include vendor/plan9port/LICENSE
 include vendor/build.sh
-include README.md TESTING.md LICENSE
+include README.md TESTING.md CHANGELOG.md LICENSE
 
 # Exclude build artifacts that may be lying around in a dev checkout.
 global-exclude *.o *.a *.so *.pyc
