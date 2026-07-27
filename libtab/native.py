@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import secrets
 from dataclasses import dataclass
 
 
@@ -266,6 +267,14 @@ def _load() -> ctypes.CDLL:
     lib.crypto_aead_unlock.argtypes = [
         _NonNullCharP, ctypes.c_char * 16, ctypes.c_char * 32, ctypes.c_char * 24,
         ctypes.c_char_p, ctypes.c_size_t, _NonNullCharP, ctypes.c_size_t,
+    ]
+
+    # crypto_eddsa_key_pair(secret_key[64], public_key[32], seed[32]) — the
+    # monocypher key generator. It overwrites `seed` with the secret key, so
+    # keypair() copies the secret out and discards the seed buffer.
+    lib.crypto_eddsa_key_pair.restype = None
+    lib.crypto_eddsa_key_pair.argtypes = [
+        ctypes.c_char * 64, ctypes.c_char * 32, ctypes.c_char * 32,
     ]
 
     return lib
@@ -670,6 +679,58 @@ SEAL_KEY_LEN = 32
 SEAL_NONCE_LEN = 24
 SEAL_MAC_LEN = 16
 _SEAL_HEADER_LEN = SEAL_NONCE_LEN + SEAL_MAC_LEN  # 40
+
+# Ed25519 (monocypher variant) key sizes. These are fixed by the algorithm,
+# not tunable strength knobs: a public key is a 32-byte curve point, the seed
+# is 32 bytes = 256 bits of entropy (~128-bit security), and the secret key is
+# 64 bytes because monocypher stores the 32-byte seed concatenated with the
+# 32-byte public key (a caching convention, not 64 bytes of secret entropy).
+SIGN_SEED_LEN = 32
+SIGN_PUBLIC_KEY_LEN = 32
+SIGN_SECRET_KEY_LEN = 64
+
+
+def _keypair_from_seed(seed: bytes) -> tuple[bytes, bytes]:
+    """Derive an Ed25519 keypair from an exact 32-byte `seed`.
+
+    Returns ``(secret_key[64], public_key[32])`` — the tuple that
+    ``NativeTable.set_signed`` (secret key) and ``verify_signed`` (public
+    key) consume directly.
+
+    SECURITY: the seed *is* the private key material. Its secrecy and
+    randomness are the entire security of every signature made with the
+    result. Prefer ``keypair()``, which draws a fresh CSPRNG seed for you.
+    Only pass a seed here if you are deliberately reproducing a key from
+    material you already generated securely — never from a password, a
+    counter, or any low-entropy value.
+    """
+    seed = _require_bytes(seed, "seed")
+    if len(seed) != SIGN_SEED_LEN:
+        raise LibtabNativeError("seed must be 32 bytes")  # pragma: no mutate
+    lib = _get_lib()
+
+    sk_buf = (ctypes.c_char * SIGN_SECRET_KEY_LEN)()
+    pk_buf = (ctypes.c_char * SIGN_PUBLIC_KEY_LEN)()
+    seed_buf = (ctypes.c_char * SIGN_SEED_LEN)(*[bytes([b]) for b in seed])
+    lib.crypto_eddsa_key_pair(sk_buf, pk_buf, seed_buf)
+    return bytes(sk_buf), bytes(pk_buf)
+
+
+def keypair() -> tuple[bytes, bytes]:
+    """Generate a fresh Ed25519 signing keypair.
+
+    Returns ``(secret_key, public_key)``:
+
+    - ``secret_key`` (64 bytes) — keep it secret; pass it to
+      ``NativeTable.set_signed`` to sign a cell.
+    - ``public_key`` (32 bytes) — share it freely; pass it to
+      ``NativeTable.verify_signed`` to check a signature.
+
+    The seed is drawn from ``secrets.token_bytes`` (the OS CSPRNG), so
+    each call yields an independent, unpredictable key — you never handle
+    raw entropy or ctypes buffers yourself.
+    """
+    return _keypair_from_seed(secrets.token_bytes(SIGN_SEED_LEN))
 
 
 def seal(key: bytes, plaintext: bytes) -> bytes:

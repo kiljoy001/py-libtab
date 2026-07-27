@@ -8,7 +8,6 @@ instead of re-deriving them.
 
 from __future__ import annotations
 
-import ctypes
 import os
 
 import pytest
@@ -30,21 +29,15 @@ def native_available() -> bool:
 
 
 def monocypher_keypair(seed: bytes) -> tuple[bytes, bytes]:
-    """Derive a monocypher-compatible Ed25519 keypair (BLAKE2b-based
-    variant — see tests/test_crypto_vectors.py for why it is NOT RFC
-    8032). Returns (secret_key[64], public_key[32])."""
+    """Derive a deterministic keypair from `seed` for reproducible tests.
+
+    Thin alias for the library's own seed helper (the ctypes derivation
+    now lives in libtab, not here). Returns (secret_key[64],
+    public_key[32]). See tests/test_crypto_vectors.py for why monocypher's
+    EdDSA is BLAKE2b-based and NOT RFC 8032."""
     from libtab import native
 
-    lib = native._get_lib()
-    lib.crypto_eddsa_key_pair.restype = None
-    lib.crypto_eddsa_key_pair.argtypes = [
-        ctypes.c_char * 64, ctypes.c_char * 32, ctypes.c_char * 32,
-    ]
-    sk = (ctypes.c_char * 64)()
-    pk = (ctypes.c_char * 32)()
-    sd = (ctypes.c_char * 32)(*[bytes([b]) for b in seed])
-    lib.crypto_eddsa_key_pair(sk, pk, sd)
-    return bytes(sk), bytes(pk)
+    return native._keypair_from_seed(seed)
 
 
 @pytest.fixture

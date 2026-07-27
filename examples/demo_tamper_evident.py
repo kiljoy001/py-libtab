@@ -15,12 +15,11 @@ The story, in one screen:
 
 No database, no server. Just a file. pip install libtab.
 """
-import ctypes
 import os
 import tempfile
 import time
 
-from libtab import NativeColumn, NativeTable, native
+from libtab import NativeColumn, NativeTable, keypair, native
 
 # ── colours for a recordable terminal ─────────────────────────────────
 G, R, Y, C, DIM, B, X = (
@@ -38,27 +37,11 @@ def step(n: int, title: str) -> None:
     pause(0.6)
 
 
-def make_keypair(seed: bytes) -> tuple[bytes, bytes]:
-    """A signing keypair (secret_key[64], public_key[32]).
-
-    The CFO holds the secret key and signs the amount; anyone with the
-    public key can verify it, but nobody can forge a new signature.
-    """
-    lib = native._get_lib()
-    lib.crypto_eddsa_key_pair.restype = None
-    lib.crypto_eddsa_key_pair.argtypes = [
-        ctypes.c_char * 64, ctypes.c_char * 32, ctypes.c_char * 32,
-    ]
-    sk = (ctypes.c_char * 64)()
-    pk = (ctypes.c_char * 32)()
-    sd = (ctypes.c_char * 32)(*[bytes([x]) for x in seed])
-    lib.crypto_eddsa_key_pair(sk, pk, sd)
-    return bytes(sk), bytes(pk)
-
-
 def main() -> None:
     path = os.path.join(tempfile.mkdtemp(), "payment.tab")
-    cfo_sk, cfo_pk = make_keypair(bytes(range(32)))
+    # The CFO holds the secret key and signs the amount; anyone with the
+    # public key can verify it, but nobody can forge a new signature.
+    cfo_sk, cfo_pk = keypair()
     vault_key = os.urandom(32)  # symmetric key for the sealed secret
 
     print(f"{B}libtab — a text file that catches forgery{X}")

@@ -22,6 +22,7 @@ from .native import (
     NativeUnavailable,
     b64_decode,
     b64_encode,
+    keypair,
     seal,
     unseal,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "NativeUnavailable",
     "b64_decode",
     "b64_encode",
+    "keypair",
     "seal",
     "unseal",
 ]
