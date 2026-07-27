@@ -33,3 +33,6 @@ tests/fuzz/crash-*
 
 # Fuzzer-discovered corpus (40-hex names); only the named seeds are tracked
 tests/fuzz/corpus_*/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*
+
+# Demo run artifact (examples/demo_tamper_evident.py writes ./payment.tab)
+examples/payment.tab
